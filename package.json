@@ -1,0 +1,28 @@
+{
+  "name": "smartcity_server",
+  "version": "1.0.0",
+  "description": "this is server for SmartCity Thesis ",
+  "main": "index.js",
+  "scripts": {
+    "test": "test",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/utilizatorvalid/SmartCity_server.git"
+  },
+  "author": "Groza Vasile",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/utilizatorvalid/SmartCity_server/issues"
+  },
+  "homepage": "https://github.com/utilizatorvalid/SmartCity_server#readme",
+  "dependencies": {
+    "body-parser": "^1.17.2",
+    "cors": "^2.8.3",
+    "express": "^4.15.3",
+    "express-jwt": "^5.3.0",
+    "mgrs": "^1.0.0",
+    "morgan": "^1.8.2"
+  }
+}
