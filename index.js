@@ -16,6 +16,9 @@ var jwtCheck = jwt({
     audience: auth0Settings.audience
 })
 
+var Coordinate = require('./coordinate');
+
+
 
 app.use(bodyParser.urlencoded({ extended: false })); //Parses urlencoded bodies
 app.use(bodyParser.json()) //SendJSON response
@@ -23,31 +26,46 @@ app.use(logger('dev'))
 app.use(cors());
 
 
+var redis = require("redis"),
+    redis_cli = redis.createClient();
 
-app.use('/location',jwtCheck);
+redis_cli.on('connect', () => {
+    console.log('connected to local redis');
+});
+
+
+
+
+app.use('/location', jwtCheck);
 app.use('/noise', jwtCheck);
 app.post('/location', (req, res) => {
-    //console.log(req.body);
-    // let position = JSON.parse(req.body.position);
+    //console.log(req.user);
     let coords = req.body.position.coords;
-    console.log(JSON.stringify(req.body.position));
 
-    var mgrs_coord =  mgrs.forward([coords.longitude,coords.latitude],4)
-    console.log(mgrs_coord)
-    console.log(mgrs.toPoint(mgrs_coord));
+    var coord = new Coordinate(coords.longitude, coords.latitude)
+    // console.log(mgrs_coord)
+    // console.log(mgrs.toPoint(mgrs_coord))
+    redis_cli.get(coord.mgrs,(err, reply)=>{
+       // console.log(JSON.parse(reply));
+        if(reply == null){
+            //console.log(coord);
+            redis_cli.set(coord.mgrs,JSON.stringify(coord));
+        }
+    });
 
-    // console.log(coords.longitude);
     var response = "location received";
     res.json(response);
 });
-app.post("/noise",(req, res)=>{
+app.post("/noise", (req, res) => {
     var response = 'noise level received';
-    console.log(req.body.coord);
+    console.log(req.body.coords);
+    var mgrs_coord = mgrs.forward([coords.longitude, coords.latitude], 4)
+    console.log(mgrs_coord)
     console.log(req.body.recordResult);
     res.json(response);
 })
 
-server.listen(port,()=>{
+server.listen(port, () => {
     console.log(`backend listening on port ${port}`);
 });
 
