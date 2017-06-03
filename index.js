@@ -39,7 +39,7 @@ app.post('/location', (req, res) => {
 
 
     let coords = req.body.position.coords;
-    var mgrs_id = mgrs.forward([coords.longitude, coords.latitude], 4);
+    var mgrs_id = mgrs.forward([coords.longitude, coords.latitude], 3);
 
     //get coordinate for current location;
     redisConnector.getCoordinate(mgrs_id, (err, result) => {
