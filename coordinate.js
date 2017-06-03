@@ -1,11 +1,19 @@
-var mgrs = require('mgrs')
+const mgrs_convertor = require('mgrs');
 
 class Coordinate {
-    constructor(longitude, latitude) {
+    constructor(longitude, latitude, mgrs) {
+        var point = mgrs_convertor.toPoint(mgrs);
+        if(longitude  == null && latitude == null)
+        {
+            longitude = point[0];
+            latitude = point[1];
+        }
+        
         this.longitude = longitude;
         this.latitude = latitude;
-        this.mgrs = mgrs.forward([longitude, latitude], 4);
+        this.mgrs = mgrs_convertor.forward([longitude, latitude], 4);
         this.devices = [];
+        this.records = [];
     }
 
     addDevice(device) {
@@ -39,7 +47,11 @@ class Coordinate {
             this.devices.splice(index, 1);
         // console.log("index",index);
         
-}
+    }
+    addRecord(record){
+        this.records.push({"timestamp":new Date(),
+                           "dbFrame": record})
+    }
 
 
 }

@@ -47,16 +47,14 @@ app.post('/location', (req, res) => {
             res.status(400).json({ "status": `error while getting coordinate${mgrs_id}` });
         let coordinate;
         let userDevice
+        //if-ul asta nu cred ca este necesar;
+        ///
         if (!result) {
-            //there was no such coordinate then i have to create it
-            coordinate = new Coordinate(coords.longitude, coords.latitude)
-        } else {
-            // console.log("already known location")
-            let coordinate_data = JSON.parse(result);
-            coordinate = new Coordinate(coordinate_data.longitude, coordinate_data.latitude);
-            coordinate.devices =  coordinate_data.devices
-
-        }
+            console.log("there is no result in redis databasea");
+            return;
+        } 
+        //
+        coordinate = result;
         redisConnector.getUserDevice(req.user.user_id,(err,result)=>{
             if(err)
                 res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
@@ -66,18 +64,17 @@ app.post('/location', (req, res) => {
             {
                 let userDevice_data = JSON.parse(result);
                 userDevice = new UserDevice(userDevice_data.user_id, userDevice_data.currentLocation);
+
                 if(mgrs_id != userDevice.currentLocation)
                 {
                     // console.log(`${typeof mgrs_id} ${typeof userDevice.currentLocation}`,mgrs_id != userDevice.currentLocation);
                     // console.log(`\t user with id${userDevice.user_id}==change location==${userDevice.currentLocation}->${mgrs_id}`);
                     redisConnector.getCoordinate(userDevice.currentLocation,(err, result)=>{
-                        let coordinate1_data = JSON.parse(result);
-                        var coordinate1 = new Coordinate(coordinate1_data.longitude, coordinate1_data.latitude);
-                        coordinate1.devices =  coordinate1_data.devices
-                        coordinate1.removeDevice(userDevice)
-                        redisConnector.saveObject(coordinate1.mgrs, coordinate1,()=>{});
+                        let old_coordinate = result;
+                        old_coordinate.removeDevice(userDevice)
+                        redisConnector.saveObject(old_coordinate.mgrs, old_coordinate,()=>{});
                     })
-                        userDevice.updateLocation(mgrs_id);
+                    userDevice.updateLocation(mgrs_id);
                     //daca se schimba locata trebuie sa il sterg  din lista deivice-urilor de la locatia la care era
                 }
             }
@@ -85,29 +82,27 @@ app.post('/location', (req, res) => {
             coordinate.addDevice(userDevice);
             redisConnector.saveObject(userDevice.user_id, userDevice, ()=>{});
             redisConnector.saveObject(coordinate.mgrs, coordinate,()=>{});
+            res.status(200).send({"status"          : "location_updated",
+                                  "currentLocation" : userDevice.currentLocation,
+                                  "lastLocation"    : userDevice.lastLocation  
+                            });
         })
         
 
     })
-    // redis_cli.get(coord.mgrs, (err, reply) => {
-    //     // console.log(JSON.parse(reply));
-    //     if (reply != null) {
-    //         //complete new coordinate have
-    //         console.log("locatie deja cunoscuta doar adaug device-ul si salvez");
-    //         coord = JSON.parse(reply);
-    //     }
-    //     coord.addDevice(userDevice);
-    //     redis_cli.set(coord.mgrs, JSON.stringify(coord));
-    //     redis_cli.set(userDevice.user_id, JSON.stringify(userDevice));
-    //     var response = "location received";
-    //     res.json(response);
-    // });
 });
 app.post("/noise", (req, res) => {
     var response = 'noise level received';
-    var mgrs_coord = mgrs.forward([req.body.coords.longitude, req.body.coords.latitude], 4)
-    console.log(mgrs_coord)
-    console.log(req.body.recordResult);
+    // var mgrs_coord = mgrs.forward([req.body.coords.longitude, req.body.coords.latitude], 4)
+    // console.log(req.body)
+    // console.log(req.body.recordResult);
+
+    redisConnector.getCoordinate(req.body.mgrs,(err, coordinate)=>{
+        if(err)
+            res.status(400).json({"status":"error while getting coordinate to update noise level"})
+        coordinate.addRecord(req.body.recordResult);
+        redisConnector.saveObject(req.body.mgrs, coordinate,()=>{});
+    });
     res.json(response);
 })
 
