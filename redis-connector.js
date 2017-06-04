@@ -1,6 +1,7 @@
 var redis = require("redis");
 var UserDevice = require('./user-device')
 var Coordinate = require("./coordinate");
+
 // redis_cli = redis.createClient();
 class RedisConnector {
     constructor(ip, port) {
@@ -20,6 +21,7 @@ class RedisConnector {
             if (!result) {
                 //there was no such coordinate then i have to create it
                 obj = new Coordinate(null, null, mgrs);
+
 
             } else {
                 // console.log("already known location")
@@ -45,7 +47,16 @@ class RedisConnector {
         })
     }
 
+    //functia scrisa de tine eu am un connector catre redis 
+    getKeys(pattern, next){
+        this.redis_cli.keys(pattern, (err,keys)=>{
+            if(err)
+                return next(err)
+            return next(null, keys);
+        })
+    }
 
 }
 
 module.exports = RedisConnector;
+

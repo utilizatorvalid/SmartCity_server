@@ -1,0 +1,8 @@
+{
+    "url":"/oauth/access_token?grant_type=fb_exchange_token&client_id={app-id}&client_secret={app-secret}&fb_exchange_token={short-lived-token}",    
+    "temp_token":"EAAZALmUcrf4oBAH98CSzZA0CJLXOTomYSUtp1tJeTNSKrWQZC7fx49IOFKrZA0qwnsamXv2ZC3WBn1IeDSQes5xLIqjJ5LFy4EJ6lj0ioBHrsoZBIk2d90eGjZCXP2lY4h2V5AdEEo02y7mC9ZAVGC0U5UYjALomV82f9Clzr7p5Gq0JimNy3cMmHQNdPAimkn8ZD",
+    "app_id":"1771971556376458",
+    "app_secret":"9a32f09b410fd28c090b8bca14d9ad31",
+    "accessToken":"EAAZALmUcrf4oBANgk8ioM0vZB2YUYeoPjZBtIQpXBd2K07IqEVqO0L4PgND0tCgbaZBTU8ADDDhePLyf3tRugE2ylkIaCZCj0QyYzTLljfAXc8sOIN6ZCNMJyhCSbLCK3ZCMYTVSq7JFekQQhZCBBhpOEr6bQK6U9nMZD"
+    // /oauth/access_token?grant_type=fb_exchange_token&amp;client_id=1771971556376458&amp;client_secret=9a32f09b410fd28c090b8bca14d9ad31&amp;fb_exchange_token=EAAZALmUcrf4oBAH98CSzZA0CJLXOTomYSUtp1tJeTNSKrWQZC7fx49IOFKrZA0qwnsamXv2ZC3WBn1IeDSQes5xLIqjJ5LFy4EJ6lj0ioBHrsoZBIk2d90eGjZCXP2lY4h2V5AdEEo02y7mC9ZAVGC0U5UYjALomV82f9Clzr7p5Gq0JimNy3cMmHQNdPAimkn8ZD
+}

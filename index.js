@@ -19,6 +19,7 @@ var jwtCheck = jwt({
 var Coordinate = require('./coordinate');
 var UserDevice = require('./user-device');
 var RedisConnector = require('./redis-connector');
+var CrawlerManager = require('./crawler-manager');
 
 app.use(bodyParser.urlencoded({ extended: false })); //Parses urlencoded bodies
 app.use(bodyParser.json()) //SendJSON response
@@ -28,7 +29,7 @@ app.use(cors());
 
 
 var redisConnector = new RedisConnector();
-
+var crawlerManager = new CrawlerManager();
 
 
 app.use('/location', jwtCheck);
@@ -75,6 +76,10 @@ app.post('/location', (req, res) => {
                         redisConnector.saveObject(old_coordinate.mgrs, old_coordinate,()=>{});
                     })
                     userDevice.updateLocation(mgrs_id);
+
+                    //request for uptade on events....
+                    
+                    crawlerManager.update(coords.longitude, coords.latitude);
                     //daca se schimba locata trebuie sa il sterg  din lista deivice-urilor de la locatia la care era
                 }
             }
@@ -91,6 +96,17 @@ app.post('/location', (req, res) => {
 
     })
 });
+
+app.get('/keys', (req, res)=>{
+    //     redisConnector.getKeys('*',(err, keys)=>{
+    //         if(err){
+    //             // console.log("am erroare cand eu cheile din redis")
+    //         }
+    //         console.log("cheile care corespund cu petternul sunt", keys);
+    //         res.send(keys)
+    // })
+    res.send("ok")
+})
 app.post("/noise", (req, res) => {
     var response = 'noise level received';
     // var mgrs_coord = mgrs.forward([req.body.coords.longitude, req.body.coords.latitude], 4)
