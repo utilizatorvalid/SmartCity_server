@@ -13,6 +13,8 @@ class RedisConnector {
     getCoordinate(mgrs, next) {
         let obj;
         console.log('getiing coordinate')
+        if(!mgrs)
+            return next(new Error("invalid mgrs"))
         this.redis_cli.get(mgrs, (err, result) => {
             if (err)
                 return next(err)
@@ -48,9 +50,9 @@ class RedisConnector {
     }
 
     //functia scrisa de tine eu am un connector catre redis 
-    getKeys(pattern, next){
-        this.redis_cli.keys(pattern, (err,keys)=>{
-            if(err)
+    getKeys(pattern, next) {
+        this.redis_cli.keys(pattern, (err, keys) => {
+            if (err)
                 return next(err)
             return next(null, keys);
         })
