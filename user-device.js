@@ -20,7 +20,7 @@ class UserDevice{
         this.currentLocation = newLocation;
     }
     addEvent(event, next){
-        console.log(`${event._id} in ${this.toDoList}`)
+        console.log(`add ${event._id} in ${this.toDoList}`)
         var index = -1;
         for (var i = 0; i < this.toDoList.length; i++) {
             // console.log(`!${this.devices[i].user_id}\n${device.user_id}!=>${this.devices[i].user_id == device.user_id}`);
@@ -31,13 +31,28 @@ class UserDevice{
         // console.log("endList")
         if (index != -1)
             return next(null,{ message:"event is already in your to_do_list"})
-        {
-            this.toDoList.push(event._id);
-            return next(null, {message:"added"})
-        }    
-        // console.log("index",index);
+        this.toDoList.push(event._id);
+        return next(null, {message:"added"})
 
         
+    }
+
+    removeEvent(event_id, next){
+         console.log(`remove ${event_id} from ${this.toDoList}`)
+         var index = -1;
+
+         for(var i=0; i<this.toDoList.length; i++){
+                if(this.toDoList[i] == event_id)
+                    index = i;
+         }
+         if(index == -1)
+            return next(null, {message:"event is already removed from to do list"});
+
+        console.log(`romoving event ${event_id} at position ${index}`)
+        this.toDoList.splice(index, 1);
+        return next(null, {message:"event removed from to do list"})
+            
+         
     }
 
 
