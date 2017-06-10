@@ -76,7 +76,7 @@ router.route('/location')
                     redisConnector.getCoordinate(userDevice.currentLocation, (err, result) => {
                         let old_coordinate = result;
                         old_coordinate.removeDevice(userDevice)
-                        redisConnector.saveObject(old_coordinate.mgrs, old_coordinate, () => { });
+                        redisConnector.saveObject(old_coordinate.mgrs_value, old_coordinate, () => { });
                     })
                     userDevice.updateLocation(mgrs_id);
 
