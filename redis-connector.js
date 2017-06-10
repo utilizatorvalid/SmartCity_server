@@ -1,5 +1,6 @@
 var redis = require("redis");
-var UserDevice = require('./user-device')
+var User = require('./user')
+var Device = require('./device')
 var Coordinate = require("./coordinate");
 
 // redis_cli = redis.createClient();
@@ -10,25 +11,25 @@ class RedisConnector {
             console.log('connected to local redis');
         });
     }
-    getCoordinate(mgrs, next) {
+    getCoordinate(mgrs_value, next) {
         let obj;
         console.log('getiing coordinate')
-        if(!mgrs)
+        if (!mgrs_value)
             return next(new Error("invalid mgrs"))
-        this.redis_cli.get(mgrs, (err, result) => {
+        this.redis_cli.get(mgrs_value, (err, result) => {
             if (err)
                 return next(err)
             // return next(null, result);
 
             if (!result) {
                 //there was no such coordinate then i have to create it
-                obj = new Coordinate(null, null, mgrs);
+                obj = new Coordinate(null, null, mgrs_value);
 
 
             } else {
                 // console.log("already known location")
                 let coordinate_data = JSON.parse(result);
-                obj = new Coordinate(coordinate_data.longitude, coordinate_data.latitude, mgrs);
+                obj = new Coordinate(coordinate_data.longitude, coordinate_data.latitude, mgrs_value);
                 obj.devices = coordinate_data.devices
                 obj.records = coordinate_data.records
             }
@@ -37,15 +38,43 @@ class RedisConnector {
         });
     }
     saveObject(objectID, object, next) {
+        console.log("SAVING", objectID, object);
         this.redis_cli.set(objectID, JSON.stringify(object));
         next(null);
     }
 
-    getUserDevice(deviceID, next) {
-        this.redis_cli.get(deviceID, (err, result) => {
+    getUserDevice(user_id, mgrs_value, next) {
+        let device_id = `device|${user_id}`;
+        let obj;
+        this.redis_cli.get(device_id, (err, result) => {
             if (err)
                 return next(err)
-            return next(null, result);
+            if (!result) {
+                obj = new Device(device_id, mgrs_value)
+            } else {
+                let deviceData = JSON.parse(result)
+                obj = new Device(deviceData.device_id, deviceData.currentLocation)
+                obj.lastLocation = deviceData.lastLocation;
+            }
+            return next(null, obj);
+        })
+    }
+    getUser(user_id, next) {
+        let obj;
+        this.redis_cli.get(user_id, (err, result) => {
+            if (err)
+                return next(err)
+
+            if(!result){
+                obj = new User(user_id);
+            }else
+            {
+                let userData = JSON.parse(result)
+                obj = new User(user_id);
+                obj.toDoList = userData.toDoList;
+                obj.history = userData.history;
+            }
+            return next(null, obj);
         })
     }
 

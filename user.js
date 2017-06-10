@@ -1,24 +1,19 @@
 var mgrs = require('mgrs')
 
-class UserDevice{
+class User{
     
     /**
      * 
-     * @param {*} user user object 
+     * @param {*} user This is user id 
      * @param {*} currentLocation location in format mgrs
      */
-    constructor(user_id, currentLocation){
+    constructor(user_id){
         this.user_id = user_id;
-        this.lastLocation = null;
-        this.currentLocation = currentLocation;
+        this.device_id = `decive|${user_id}`
         this.toDoList = [];
+        this.history  = [];
     }
-    updateLocation(newLocation){
-        
-        console.log("user-device change Location", `${this.currentLocation}->${newLocation}`);
-        this.lastLocation = this.currentLocation;
-        this.currentLocation = newLocation;
-    }
+   
     addEvent(event, next){
         console.log(`add ${event._id} in ${this.toDoList}`)
         var index = -1;
@@ -37,7 +32,7 @@ class UserDevice{
         
     }
 
-    removeEvent(event_id, next){
+    removeEvent(event_id, rejected, next){
          console.log(`remove ${event_id} from ${this.toDoList}`)
          var index = -1;
 
@@ -49,13 +44,17 @@ class UserDevice{
             return next(null, {message:"event is already removed from to do list"});
 
         console.log(`romoving event ${event_id} at position ${index}`)
+        if(!rejected)
+            this.history.push(event_id);
+            
         this.toDoList.splice(index, 1);
         return next(null, {message:"event removed from to do list"})
-            
+           
          
     }
 
 
+
 }
 
-module.exports = UserDevice;
+module.exports = User;

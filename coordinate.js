@@ -1,10 +1,10 @@
 const mgrs_convertor = require('mgrs');
 
 class Coordinate {
-    constructor(longitude, latitude, mgrs) {
+    constructor(longitude, latitude, mgrs_value) {
         var point
-        if(mgrs)
-         point = mgrs_convertor.toPoint(mgrs);
+        if(mgrs_value)
+            point = mgrs_convertor.toPoint(mgrs_value);
          
         if (longitude == null && latitude == null) {
             longitude = point[0];
@@ -13,7 +13,7 @@ class Coordinate {
 
         this.longitude = longitude;
         this.latitude = latitude;
-        this.mgrs = mgrs_convertor.forward([longitude, latitude], 3);
+        this.mgrs_value = mgrs_convertor.forward([longitude, latitude], 3);
         this.devices = [];
         this.records = [];
     }

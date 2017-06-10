@@ -17,7 +17,8 @@ var jwtCheck = jwt({
 })
 
 var Coordinate = require('./coordinate');
-var UserDevice = require('./user-device');
+var User = require('./user');
+var Device = require('./device');
 var RedisConnector = require('./redis-connector');
 var CrawlerManager = require('./crawler-manager');
 var event_api_url = "http://smartcityeventapi.azurewebsites.net/api/events"
@@ -39,6 +40,7 @@ var crawlerManager = new CrawlerManager();
 var router = express.Router();
 
 router.use((req, res, next) => {
+    decodeURI(req);
     next()
 })
 
@@ -64,45 +66,34 @@ router.route('/location')
                 console.log("there is no result in redis databasea");
                 return;
             }
-            //
             coordinate = result;
-            redisConnector.getUserDevice(req.user.user_id, (err, result) => {
+
+            redisConnector.getUserDevice(req.user.user_id, mgrs_id, (err, userDevice) => {
                 if (err)
-                   return res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
-                if (!result) {
-                    userDevice = new UserDevice(req.user.user_id, mgrs_id)
-                } else {
-                    let userDevice_data = JSON.parse(result);
-                    userDevice = new UserDevice(userDevice_data.user_id, userDevice_data.currentLocation);
-                    userDevice.toDoList = userDevice_data.toDoList
-                    if (mgrs_id != userDevice.currentLocation) {
-                        // console.log(`${typeof mgrs_id} ${typeof userDevice.currentLocation}`,mgrs_id != userDevice.currentLocation);
-                        // console.log(`\t user with id${userDevice.user_id}==change location==${userDevice.currentLocation}->${mgrs_id}`);
-                        redisConnector.getCoordinate(userDevice.currentLocation, (err, result) => {
-                            let old_coordinate = result;
-                            old_coordinate.removeDevice(userDevice)
-                            redisConnector.saveObject(old_coordinate.mgrs, old_coordinate, () => { });
-                        })
-                        userDevice.updateLocation(mgrs_id);
+                    return res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
 
-                        //request for uptade on events....
+                if (mgrs_id != userDevice.currentLocation) {
+                    redisConnector.getCoordinate(userDevice.currentLocation, (err, result) => {
+                        let old_coordinate = result;
+                        old_coordinate.removeDevice(userDevice)
+                        redisConnector.saveObject(old_coordinate.mgrs, old_coordinate, () => { });
+                    })
+                    userDevice.updateLocation(mgrs_id);
 
-                        crawlerManager.update(coords.longitude, coords.latitude);
-                        //daca se schimba locata trebuie sa il sterg  din lista deivice-urilor de la locatia la care era
-                    }
+                    crawlerManager.update(coords.longitude, coords.latitude);
+                    //daca se schimba locata trebuie sa il sterg  din lista deivice-urilor de la locatia la care era
                 }
+
                 // console.log("HERE")
                 coordinate.addDevice(userDevice);
-                redisConnector.saveObject(userDevice.user_id, userDevice, () => { });
-                redisConnector.saveObject(coordinate.mgrs, coordinate, () => { });
+                redisConnector.saveObject(`device|${req.user.user_id}`, userDevice, () => { });
+                redisConnector.saveObject(coordinate.mgrs_value, coordinate, () => { });
                 res.status(200).send({
                     "status": "location_updated",
                     "currentLocation": userDevice.currentLocation,
                     "lastLocation": userDevice.lastLocation
                 });
             })
-
-
         })
     })
 
@@ -153,49 +144,39 @@ router.route('/schedule')
     .get((req, res) => {
         //geting all users event to do 
         console.log('Schedule for user:', req.user.nickname);
-        redisConnector.getUserDevice(req.user.user_id, (err, result) => {
+        redisConnector.getUser(req.user.user_id, (err, user) => {
             if (err)
                 return res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
-            if (!result) {
-                console.log("HERE");
-                userDevice = new UserDevice(req.user.user_id, mgrs_id)
-            } else {
-                let userDevice_data = JSON.parse(result);
-                userDevice = new UserDevice(userDevice_data.user_id, userDevice_data.currentLocation);
-                userDevice.toDoList = userDevice_data.toDoList
-            }
             var fetched_events = 0;
             var user_events = [];
-            if(userDevice.toDoList.length == 0)
-                return res.status(200).json({events:[]})
-            userDevice.toDoList.forEach(function (event_id) {
+            if (user.toDoList.length == 0)
+                return res.status(200).json({ events: [] })
+            user.toDoList.forEach(function (event_id) {
                 var options = {
                     method: 'GET',
                     url: `http://smartcityeventapi.azurewebsites.net/api/events/${event_id}`,
                     headers:
                     { 'content-type': 'application/json' }
                 }
-                request(options, (err, response, body)=>{
-                    fetched_events ++;
-                    if(!body)
+                request(options, (err, response, body) => {
+                    fetched_events++;
+                    if (!body)
                         return;
-                    console.log("HERE++++++++++++++++++++++++++++++++++",body)
+                    // console.log("HERE++++++++++++++++++++++++++++++++++", body)
                     body = JSON.parse(body);
                     // console.log(typeof(body));
-                    if(err)
-                    {
+                    if (err) {
                         //todo
                         return;
                     }
                     user_events.push(body.events[0]);
-                    if (fetched_events == userDevice.toDoList.length)
-                    {
-                        user_events.sort((a,b)=>{return (a.startTime > b.startTime) ? 1 : ((b.startTime > a.startTime) ? -1 : 0);});
-                        return res.status(200).json({events:user_events});
+                    if (fetched_events == user.toDoList.length) {
+                        user_events.sort((a, b) => { return (a.startTime > b.startTime) ? 1 : ((b.startTime > a.startTime) ? -1 : 0); });
+                        return res.status(200).json({ events: user_events });
                     }
 
                 })
-                
+
             }, this);
 
         });
@@ -205,52 +186,93 @@ router.route('/schedule/:event_id')
     .post((req, res) => {
         console.log("add event", req.params.event_id, ' in users', req.user.user_id, ' toDoList');
         // console.log(req.body);
-        redisConnector.getUserDevice(req.user.user_id, (err, result) => {
+        redisConnector.getUser(req.user.user_id, (err, user) => {
             if (err)
                 return res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
-            if (!result) {
-                console.log("HERE");
-                userDevice = new UserDevice(req.user.user_id, mgrs_id)
-            } else {
-                let userDevice_data = JSON.parse(result);
-                userDevice = new UserDevice(userDevice_data.user_id, userDevice_data.currentLocation);
-                userDevice.toDoList = userDevice_data.toDoList
-            }
-            // console.log(userDevice);
-            userDevice.addEvent(req.body, (err, status) => {
+
+            user.addEvent(req.body, (err, status) => {
                 if (err) {
                     return res.status(400).json("Error while adding event in toDoList")
                 }
-                redisConnector.saveObject(userDevice.user_id, userDevice, () => {
+                redisConnector.saveObject(user.user_id, user, () => {
                     return res.status(200).json(status);
                 })
 
             });
         });
     })
-    .delete((req,res)=>{
+    .delete((req, res) => {
         // console.log("remove event", req.params.event_id, ' in users', req.user.user_id, ' toDoList' );
-        redisConnector.getUserDevice(req.user.user_id,(err, result)=>{
+        redisConnector.getUser(req.user.user_id, (err, user) => {
             if (err)
                 return res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
-            if (!result) {
-                console.log("HERE");
-                userDevice = new UserDevice(req.user.user_id, mgrs_id)
-            } else {
-                let userDevice_data = JSON.parse(result);
-                userDevice = new UserDevice(userDevice_data.user_id, userDevice_data.currentLocation);
-                userDevice.toDoList = userDevice_data.toDoList
-            }
-            userDevice.removeEvent(req.params.event_id,(err, response)=>{
-                if(err)
-                    return res.status(400).json({"message":"error while removing event from to do list"});
-                redisConnector.saveObject(userDevice.user_id, userDevice, () => {
-                    return res.status(200).json(response);
+            user.removeEvent(req.params.event_id, true, (err, status) => {
+                if (err)
+                    return res.status(400).json({ "message": "error while removing event from to do list" });
+                redisConnector.saveObject(user.user_id, user, () => {
+                    return res.status(200).json({ "status": "REMOVED" });
                 })
             })
 
         })
     })
+router.route('/user')
+    .put((req, res) => {
+
+    })
+    .post((req, res) => {
+
+    })
+    .get((req, res) => {
+
+        // console.log("USER ID::::",decodeURI(req.));
+        redisConnector.getUser(req.params.user_id, (err, user) => {
+            if (err) {
+                return res.status(400).json({ "status": `error while getting User${req.user.user_id}` });
+            }
+
+            console.log(user);
+            return res.status(200).json({
+                "status": "OK",
+                "user": user
+            });
+        })
+    })
+
+router.route('/user/:user_id')
+    .post((req, res) => {
+        //create user
+        redisConnector.getUser(req, params.user_id, (err, user) => {
+            if (err)
+                return res.status(400).json({ "status": `error while saving User${req.user.user_id}` });
+            redisConnector.saveObject(user.user_id, user, () => {
+                return res.status(200).json({
+                    "status": "OK",
+                    "user": user
+                });
+            })
+        })
+
+    })
+    .get((req, res) => {
+        redisConnector.getUser(req.params.user_id, (err, user) => {
+            if (err)
+                return res.status(400).json({ "status": `error while getting user${req.user.user_id}` });
+
+            redisConnector.getUserDevice(user.user_id, null, (err, device) => {
+                if (err)
+                    return res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
+
+                return res.status(200).json({
+                    "user": user,
+                    "device": device
+                });
+            })
+
+        })
+    })
+    
+
 
 
 
