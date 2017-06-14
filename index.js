@@ -245,7 +245,7 @@ router.route('/events')
 
             var options = {
                 method: 'GET',
-                url: `http://localhost:8080/api/events?${queryString.stringify(params)}`,
+                url: `${event_api_url}${queryString.stringify(params)}`,
                 headers:
                 { 'content-type': 'application/json' }
             }
