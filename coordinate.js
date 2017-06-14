@@ -3,9 +3,9 @@ const mgrs_convertor = require('mgrs');
 class Coordinate {
     constructor(longitude, latitude, mgrs_value) {
         var point
-        if(mgrs_value)
+        if (mgrs_value)
             point = mgrs_convertor.toPoint(mgrs_value);
-         
+
         if (longitude == null && latitude == null) {
             longitude = point[0];
             latitude = point[1];
@@ -24,7 +24,7 @@ class Coordinate {
         for (var i = 0; i < this.devices.length; i++) {
             // console.log(`!${this.devices[i].user_id}\n${device.user_id}!=>${this.devices[i].user_id == device.user_id}`);
             // console.log(this.devices[i].user_id);
-            if (this.devices[i].user_id == device.user_id)
+            if (this.devices[i].device_id == device.device_id)
                 index = i;
         }
         // console.log("endList")
@@ -39,7 +39,7 @@ class Coordinate {
         var index = -1;
         for (var i = 0; i < this.devices.length; i++) {
             // console.log(`|${this.devices[i].user_id}|\n|${device.user_id}|=>${this.devices[i].user_id == device.user_id}`);
-            if (this.devices[i].user_id == device.user_id)
+            if (this.devices[i].device_id == device.device_id)
                 index = i;
         }
         // console.log("endList")

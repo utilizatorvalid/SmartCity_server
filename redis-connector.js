@@ -38,7 +38,7 @@ class RedisConnector {
         });
     }
     saveObject(objectID, object, next) {
-        console.log("SAVING", objectID, object);
+        // console.log("SAVING", objectID, object);
         this.redis_cli.set(objectID, JSON.stringify(object));
         next(null);
     }
@@ -65,10 +65,9 @@ class RedisConnector {
             if (err)
                 return next(err)
 
-            if(!result){
+            if (!result) {
                 obj = new User(user_id);
-            }else
-            {
+            } else {
                 let userData = JSON.parse(result)
                 obj = new User(user_id);
                 obj.toDoList = userData.toDoList;
@@ -85,6 +84,31 @@ class RedisConnector {
                 return next(err)
             return next(null, keys);
         })
+    }
+
+    removeExpiredRecords(next) {
+        redisConnector.getKeys("[1-9][1-9][A-Z][A-Z][A-Z]*", (err, keys) => {
+            if (err)
+                return;
+            console.log(keys);
+            var index = 0;
+            keys.forEach(function (mgrs) {
+                redisConnector.getCoordinate(mgrs, (err, coordinate) => {
+                    if (err) {
+                        // continue;
+                        console.log(err);
+                    }
+                    console.log("clean->", mgrs)
+
+                    coordinate.clearNoiseMeasures();
+                    redisConnector.saveObject(mgrs, coordinate, () => { });
+                    index++;
+                    if (index === keys.length)
+                        next("all clear");
+                })
+            }, this);
+        })
+
     }
 
 }

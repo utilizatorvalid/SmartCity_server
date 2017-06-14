@@ -2,6 +2,7 @@ var http = require("http");
 var express = require("express");
 var app = express();
 var logger = require("morgan")
+var queryString = require('query-string')
 var bodyParser = require('body-parser')
 var cors = require("cors")
 var mgrs = require('mgrs')
@@ -68,30 +69,30 @@ router.route('/location')
             }
             coordinate = result;
 
-            redisConnector.getUserDevice(req.user.user_id, mgrs_id, (err, userDevice) => {
+            redisConnector.getUserDevice(req.user.user_id, mgrs_id, (err, device) => {
                 if (err)
                     return res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
 
-                if (mgrs_id != userDevice.currentLocation) {
-                    redisConnector.getCoordinate(userDevice.currentLocation, (err, result) => {
+                if (mgrs_id != device.currentLocation) {
+                    redisConnector.getCoordinate(device.currentLocation, (err, result) => {
                         let old_coordinate = result;
-                        old_coordinate.removeDevice(userDevice)
+                        old_coordinate.removeDevice(device)
                         redisConnector.saveObject(old_coordinate.mgrs_value, old_coordinate, () => { });
                     })
-                    userDevice.updateLocation(mgrs_id);
+                    device.updateLocation(mgrs_id);
 
                     crawlerManager.update(coords.longitude, coords.latitude);
                     //daca se schimba locata trebuie sa il sterg  din lista deivice-urilor de la locatia la care era
                 }
 
                 // console.log("HERE")
-                coordinate.addDevice(userDevice);
-                redisConnector.saveObject(`device|${req.user.user_id}`, userDevice, () => { });
+                coordinate.addDevice(device);
+                redisConnector.saveObject(device.device_id, device, () => { });
                 redisConnector.saveObject(coordinate.mgrs_value, coordinate, () => { });
                 res.status(200).send({
                     "status": "location_updated",
-                    "currentLocation": userDevice.currentLocation,
-                    "lastLocation": userDevice.lastLocation
+                    "currentLocation": device.currentLocation,
+                    "lastLocation": device.lastLocation
                 });
             })
         })
@@ -136,7 +137,17 @@ router.route('/location/:location_id')
         redisConnector.getCoordinate(req.params.location_id, (err, coordinate) => {
             if (err)
                 return res.status(400).json({ "status": "error while getting location" });
-            res.json(coordinate)
+            let noiseLevelMean = 0;
+            let sum = 0;
+            if (coordinate.records.length > 0) {
+                for (var i = 0; i < coordinate.records.length; i++) {
+                    let record = coordinate.records[i];
+                    sum += record.dbFrame.average
+                };
+                noiseLevelMean = sum / coordinate.records.length
+            }
+            res.status(200).json({ "noiseLevelMean": noiseLevelMean });
+
         })
     })
 
@@ -146,7 +157,7 @@ router.route('/schedule')
         console.log('Schedule for user:', req.user.nickname);
         redisConnector.getUser(req.user.user_id, (err, user) => {
             if (err)
-                return res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
+                return res.status(400).json({ "status": `error while getting user${req.user.user_id}` });
             var fetched_events = 0;
             var user_events = [];
             if (user.toDoList.length == 0)
@@ -188,7 +199,7 @@ router.route('/schedule/:event_id')
         // console.log(req.body);
         redisConnector.getUser(req.user.user_id, (err, user) => {
             if (err)
-                return res.status(400).json({ "status": `error while getting userDevice${req.user.user_id}` });
+                return res.status(400).json({ "status": `error while getting User${req.user.user_id}` });
 
             user.addEvent(req.body, (err, status) => {
                 if (err) {
@@ -216,6 +227,49 @@ router.route('/schedule/:event_id')
 
         })
     })
+
+router.route('/events')
+    .get((req, res) => {
+        let params = req.query;
+        params["nP"] = 3
+        console.log(params);
+        console.log(queryString.stringify(params));
+        console.log(">>>>>>>>>>>>>>>>>", params['mgrs']);
+        let zones = getZones(params.mgrs);
+        console.log(zones);
+        var processedZones = 0;
+        var eventsNearby = [];
+        zones.forEach(function (zone) {
+
+            params.mgrs = zone;
+
+            var options = {
+                method: 'GET',
+                url: `http://localhost:8080/api/events?${queryString.stringify(params)}`,
+                headers:
+                { 'content-type': 'application/json' }
+            }
+            request(options, (err, response, body) => {
+                processedZones++;
+                if (!body)
+                    return;
+                // return res.status(400).json({"status":"error getting events form api"});
+                body = JSON.parse(body);
+                if (err) {
+                    return;
+                    // return res.status(400).json({"status":"error getting events form api"});
+                }
+
+                eventsNearby = eventsNearby.concat(body.events);
+                if (processedZones == zones.length) {
+                    console.log("HEREEEEEEEEEEEEEE", eventsNearby.length)
+                    eventsNearby.sort((a, b) => { return (a.startTime > b.startTime) ? 1 : ((b.startTime > a.startTime) ? -1 : 0); });
+                    return res.status(200).json({ events: eventsNearby });
+                }
+            })
+        }, this);
+    })
+
 router.route('/user')
     .put((req, res) => {
 
@@ -271,7 +325,30 @@ router.route('/user/:user_id')
 
         })
     })
-    
+
+router.route('/weather')
+    .get((req, res) => {
+        console.log(req.query);
+        req.query['APPID'] = "c3ec8d1775bd91da4f6d7d7d6ae1a195";
+
+        var request = require("request");
+
+        var options = {
+            method: 'GET',
+            url: 'http://api.openweathermap.org/data/2.5/forecast/daily',
+            qs:req.query
+            ,
+            headers:{ 'content-type': 'application/json' }
+        };
+
+        request(options, (error, response, body)=>{
+             if (error) {
+                    return res.status(400).json("Error while fetching weather data")
+                }
+            console.log(body);
+            return res.status(200).json(body);
+        });
+    })
 
 
 
@@ -283,27 +360,52 @@ app.use('/', router);
 
 
 
-clearNoiseMeasures = (next) => {
-    redisConnector.getKeys("[1-9][1-9][A-Z][A-Z][A-Z]*", (err, keys) => {
-        if (err)
-            return;
-        console.log(keys);
-        var index = 0;
-        keys.forEach(function (mgrs) {
-            redisConnector.getCoordinate(mgrs, (err, coordinate) => {
-                if (err) {
-                    // continue;
-                    console.log(err);
-                }
-                console.log("clean->", mgrs)
+getZones = (mgrs_pos) => {
+    let mgrs1 = mgrs_pos.split('');
+    mgrs1[4 + 3 - 1] = parseInt(mgrs1[4 + 3 - 1]) - 1;
+    mgrs1[4 + 6 - 1] = parseInt(mgrs1[4 + 6 - 1]) - 1;
 
-                coordinate.clearNoiseMeasures();
-                redisConnector.saveObject(mgrs, coordinate, () => { });
-                index++;
-                if (index === keys.length)
-                    next("all clear");
-            })
-        }, this);
+    let mgrs2 = mgrs_pos.split('');
+    mgrs2[4 + 3 - 1] = parseInt(mgrs2[4 + 3 - 1]) - 1;
+    mgrs2[4 + 6 - 1] = parseInt(mgrs2[4 + 6 - 1]) + 0;
+
+    let mgrs3 = mgrs_pos.split('');
+    mgrs3[4 + 3 - 1] = parseInt(mgrs3[4 + 3 - 1]) - 1;
+    mgrs3[4 + 6 - 1] = parseInt(mgrs3[4 + 6 - 1]) + 1;
+
+    let mgrs4 = mgrs_pos.split('');
+    mgrs4[4 + 3 - 1] = parseInt(mgrs4[4 + 3 - 1]) + 1;
+    mgrs4[4 + 6 - 1] = parseInt(mgrs4[4 + 6 - 1]) - 1;
+
+    let mgrs5 = mgrs_pos.split('');
+    mgrs5[4 + 3 - 1] = parseInt(mgrs5[4 + 3 - 1]) + 1;
+    mgrs5[4 + 6 - 1] = parseInt(mgrs5[4 + 6 - 1]) + 0;
+
+    let mgrs6 = mgrs_pos.split('');
+    mgrs6[4 + 3 - 1] = parseInt(mgrs6[4 + 3 - 1]) + 1;
+    mgrs6[4 + 6 - 1] = parseInt(mgrs6[4 + 6 - 1]) + 1;
+
+    let mgrs7 = mgrs_pos.split('');
+    mgrs7[4 + 3 - 1] = parseInt(mgrs7[4 + 3 - 1]) + 0;
+    mgrs7[4 + 6 - 1] = parseInt(mgrs7[4 + 6 - 1]) - 1;
+
+    let mgrs8 = mgrs_pos.split('');
+    mgrs8[4 + 3 - 1] = parseInt(mgrs8[4 + 3 - 1]) + 0;
+    mgrs8[4 + 6 - 1] = parseInt(mgrs8[4 + 6 - 1]) + 1;
+    return [mgrs_pos,
+        mgrs1.join(''),
+        mgrs2.join(''),
+        mgrs3.join(''),
+        mgrs4.join(''),
+        mgrs5.join(''),
+        mgrs6.join(''),
+        mgrs7.join(''),
+        mgrs8.join('')]
+}
+
+clearNoiseMeasures = (next) => {
+    redisConnector.removeExpiredRecords((status) => {
+        next(status);
     })
 
 
