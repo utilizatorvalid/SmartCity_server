@@ -22,6 +22,7 @@ var User = require('./user');
 var Device = require('./device');
 var RedisConnector = require('./redis-connector');
 var CrawlerManager = require('./crawler-manager');
+// var event_api_url = 'http://localhost:8080/api/events'
 var event_api_url = "http://smartcityeventapi.azurewebsites.net/api/events"
 var request = require('request')
 app.use(bodyParser.urlencoded({ extended: false })); //Parses urlencoded bodies
@@ -165,7 +166,7 @@ router.route('/schedule')
             user.toDoList.forEach(function (event_id) {
                 var options = {
                     method: 'GET',
-                    url: `http://smartcityeventapi.azurewebsites.net/api/events/${event_id}`,
+                    url: `${event_api_url}/${event_id}`,
                     headers:
                     { 'content-type': 'application/json' }
                 }
@@ -231,12 +232,13 @@ router.route('/schedule/:event_id')
 router.route('/events')
     .get((req, res) => {
         let params = req.query;
-        params["nP"] = 3
-        console.log(params);
+        console.log(params)
+        if(!params["nP"])
+            params["nP"] = 3
         console.log(queryString.stringify(params));
         console.log(">>>>>>>>>>>>>>>>>", params['mgrs']);
-        let zones = getZones(params.mgrs);
-        console.log(zones);
+        let zones = getZones(params.mgrs,params.radius);
+        console.log(zones.length, zones);
         var processedZones = 0;
         var eventsNearby = [];
         zones.forEach(function (zone) {
@@ -245,7 +247,7 @@ router.route('/events')
 
             var options = {
                 method: 'GET',
-                url: `${event_api_url}${queryString.stringify(params)}`,
+                url: `${event_api_url}?${queryString.stringify(params)}`,
                 headers:
                 { 'content-type': 'application/json' }
             }
@@ -262,8 +264,8 @@ router.route('/events')
 
                 eventsNearby = eventsNearby.concat(body.events);
                 if (processedZones == zones.length) {
-                    console.log("HEREEEEEEEEEEEEEE", eventsNearby.length)
                     eventsNearby.sort((a, b) => { return (a.startTime > b.startTime) ? 1 : ((b.startTime > a.startTime) ? -1 : 0); });
+                    console.log("Sending events to user", eventsNearby.length);
                     return res.status(200).json({ events: eventsNearby });
                 }
             })
@@ -345,7 +347,8 @@ router.route('/weather')
              if (error) {
                     return res.status(400).json("Error while fetching weather data")
                 }
-            console.log(body);
+            console.log("body is", typeof(body));
+            body = JSON.parse(body);
             return res.status(200).json(body);
         });
     })
@@ -360,47 +363,30 @@ app.use('/', router);
 
 
 
-getZones = (mgrs_pos) => {
-    let mgrs1 = mgrs_pos.split('');
-    mgrs1[4 + 3 - 1] = parseInt(mgrs1[4 + 3 - 1]) - 1;
-    mgrs1[4 + 6 - 1] = parseInt(mgrs1[4 + 6 - 1]) - 1;
+getZones = (mgrs_pos, distanceFactor) => {
+    let min = -Math.trunc(distanceFactor/2)
+    let max = - min;
+    let result = [];
+    mgrs_accuracy = 3
+    for (var i = min; i<=max; i++)
+        for(var j = min; j<max-i; j++)
+        {   
 
-    let mgrs2 = mgrs_pos.split('');
-    mgrs2[4 + 3 - 1] = parseInt(mgrs2[4 + 3 - 1]) - 1;
-    mgrs2[4 + 6 - 1] = parseInt(mgrs2[4 + 6 - 1]) + 0;
+            let temp_mgrs = [mgrs_pos.slice(0,5), parseInt(mgrs_pos.slice(5,5+mgrs_accuracy)), parseInt(mgrs_pos.slice(5+mgrs_accuracy,5+ 2*mgrs_accuracy))];
+            temp_mgrs[1] = temp_mgrs[1] + i*10;
+            temp_mgrs[2] = temp_mgrs[2] + j*10;
+            
+            result.push(temp_mgrs.join(''));
+            if(j==-i){
+                break;
+            }
 
-    let mgrs3 = mgrs_pos.split('');
-    mgrs3[4 + 3 - 1] = parseInt(mgrs3[4 + 3 - 1]) - 1;
-    mgrs3[4 + 6 - 1] = parseInt(mgrs3[4 + 6 - 1]) + 1;
-
-    let mgrs4 = mgrs_pos.split('');
-    mgrs4[4 + 3 - 1] = parseInt(mgrs4[4 + 3 - 1]) + 1;
-    mgrs4[4 + 6 - 1] = parseInt(mgrs4[4 + 6 - 1]) - 1;
-
-    let mgrs5 = mgrs_pos.split('');
-    mgrs5[4 + 3 - 1] = parseInt(mgrs5[4 + 3 - 1]) + 1;
-    mgrs5[4 + 6 - 1] = parseInt(mgrs5[4 + 6 - 1]) + 0;
-
-    let mgrs6 = mgrs_pos.split('');
-    mgrs6[4 + 3 - 1] = parseInt(mgrs6[4 + 3 - 1]) + 1;
-    mgrs6[4 + 6 - 1] = parseInt(mgrs6[4 + 6 - 1]) + 1;
-
-    let mgrs7 = mgrs_pos.split('');
-    mgrs7[4 + 3 - 1] = parseInt(mgrs7[4 + 3 - 1]) + 0;
-    mgrs7[4 + 6 - 1] = parseInt(mgrs7[4 + 6 - 1]) - 1;
-
-    let mgrs8 = mgrs_pos.split('');
-    mgrs8[4 + 3 - 1] = parseInt(mgrs8[4 + 3 - 1]) + 0;
-    mgrs8[4 + 6 - 1] = parseInt(mgrs8[4 + 6 - 1]) + 1;
-    return [mgrs_pos,
-        mgrs1.join(''),
-        mgrs2.join(''),
-        mgrs3.join(''),
-        mgrs4.join(''),
-        mgrs5.join(''),
-        mgrs6.join(''),
-        mgrs7.join(''),
-        mgrs8.join('')]
+            temp_mgrs = [mgrs_pos.slice(0,5), parseInt(mgrs_pos.slice(5,5+mgrs_accuracy)), parseInt(mgrs_pos.slice(5+mgrs_accuracy,5+ 2*mgrs_accuracy))];
+            temp_mgrs[1] = temp_mgrs[1] - j*10;
+            temp_mgrs[2] = temp_mgrs[2] - i*10;
+            result.push(temp_mgrs.join(''));
+        }
+    return result
 }
 
 clearNoiseMeasures = (next) => {
