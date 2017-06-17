@@ -87,13 +87,13 @@ class RedisConnector {
     }
 
     removeExpiredRecords(next) {
-        redisConnector.getKeys("[1-9][1-9][A-Z][A-Z][A-Z]*", (err, keys) => {
+        this.getKeys("[1-9][1-9][A-Z][A-Z][A-Z]*", (err, keys) => {
             if (err)
                 return;
             console.log(keys);
             var index = 0;
             keys.forEach(function (mgrs) {
-                redisConnector.getCoordinate(mgrs, (err, coordinate) => {
+                this.getCoordinate(mgrs, (err, coordinate) => {
                     if (err) {
                         // continue;
                         console.log(err);
@@ -101,7 +101,7 @@ class RedisConnector {
                     console.log("clean->", mgrs)
 
                     coordinate.clearNoiseMeasures();
-                    redisConnector.saveObject(mgrs, coordinate, () => { });
+                    this.saveObject(mgrs, coordinate, () => { });
                     index++;
                     if (index === keys.length)
                         next("all clear");

@@ -25,10 +25,15 @@ var CrawlerManager = require('./crawler-manager');
 // var event_api_url = 'http://localhost:8080/api/events'
 var event_api_url = "http://smartcityeventapi.azurewebsites.net/api/events"
 var request = require('request')
+
+var GoogleAPI = require('./google.api')
+var googleAPI = new GoogleAPI()
 app.use(bodyParser.urlencoded({ extended: false })); //Parses urlencoded bodies
 app.use(bodyParser.json()) //SendJSON response
 app.use(logger('dev'))
 app.use(cors());
+
+app.use(express.static('public'))
 
 
 
@@ -233,11 +238,11 @@ router.route('/events')
     .get((req, res) => {
         let params = req.query;
         console.log(params)
-        if(!params["nP"])
+        if (!params["nP"])
             params["nP"] = 3
         console.log(queryString.stringify(params));
         console.log(">>>>>>>>>>>>>>>>>", params['mgrs']);
-        let zones = getZones(params.mgrs,params.radius);
+        let zones = getZones(params.mgrs, params.radius);
         console.log(zones.length, zones);
         var processedZones = 0;
         var eventsNearby = [];
@@ -338,52 +343,88 @@ router.route('/weather')
         var options = {
             method: 'GET',
             url: 'http://api.openweathermap.org/data/2.5/forecast/daily',
-            qs:req.query
+            qs: req.query
             ,
-            headers:{ 'content-type': 'application/json' }
+            headers: { 'content-type': 'application/json' }
         };
 
-        request(options, (error, response, body)=>{
-             if (error) {
-                    return res.status(400).json("Error while fetching weather data")
-                }
-            console.log("body is", typeof(body));
+        request(options, (error, response, body) => {
+            if (error) {
+                return res.status(400).json("Error while fetching weather data")
+            }
+            console.log("body is", typeof (body));
             body = JSON.parse(body);
             return res.status(200).json(body);
         });
+    })
+router.route('/city/:mgrs_value')
+    .get((req, res) => {
+        console.log(req.params.mgrs_value);
+        let geoPoint = mgrs.toPoint(req.params.mgrs_value);
+        googleAPI.getCityByGeocoordinate(geoPoint[1], geoPoint[0], (err, result) => {
+
+            res.status(200).json({
+                status: 'ok',
+                result: result
+            })
+        });
+    });
+
+router.route('/city/:mgrs_value/places')
+    .get((req, res) => {
+        // console.log(req.params.mgrs_value)
+        let geoPoint = mgrs.toPoint(req.params.mgrs_value);
+        googleAPI.getNearbyPlaces(geoPoint[1], geoPoint[0], 3000, (err, placesObj) => {
+            res.status(200).json({
+                status: 'ok',
+                places: placesObj
+            })
+        })
+    })
+
+router.route('/place/:place_id')
+    .get((req, res) => {
+        googleAPI.getPlaceDetais(req.params.place_id,(err, placeDetails)=>{
+            if(err)
+                return res.status(400).json({'status':'error while retriving place details'})
+            return res.status(200).json(placeDetails);
+        })
     })
 
 
 
 
+
+
+// setting authentication check
 app.use('/location', jwtCheck);
 app.use('/noise', jwtCheck);
 app.use('/schedule', jwtCheck);
+app.use('/city', jwtCheck);
 app.use('/', router);
 
 
 
 getZones = (mgrs_pos, distanceFactor) => {
-    let min = -Math.trunc(distanceFactor/2)
+    let min = -Math.trunc(distanceFactor / 2)
     let max = - min;
     let result = [];
     mgrs_accuracy = 3
-    for (var i = min; i<=max; i++)
-        for(var j = min; j<max-i; j++)
-        {   
+    for (var i = min; i <= max; i++)
+        for (var j = min; j < max - i; j++) {
 
-            let temp_mgrs = [mgrs_pos.slice(0,5), parseInt(mgrs_pos.slice(5,5+mgrs_accuracy)), parseInt(mgrs_pos.slice(5+mgrs_accuracy,5+ 2*mgrs_accuracy))];
-            temp_mgrs[1] = temp_mgrs[1] + i*10;
-            temp_mgrs[2] = temp_mgrs[2] + j*10;
-            
+            let temp_mgrs = [mgrs_pos.slice(0, 5), parseInt(mgrs_pos.slice(5, 5 + mgrs_accuracy)), parseInt(mgrs_pos.slice(5 + mgrs_accuracy, 5 + 2 * mgrs_accuracy))];
+            temp_mgrs[1] = temp_mgrs[1] + i * 10;
+            temp_mgrs[2] = temp_mgrs[2] + j * 10;
+
             result.push(temp_mgrs.join(''));
-            if(j==-i){
+            if (j == -i) {
                 break;
             }
 
-            temp_mgrs = [mgrs_pos.slice(0,5), parseInt(mgrs_pos.slice(5,5+mgrs_accuracy)), parseInt(mgrs_pos.slice(5+mgrs_accuracy,5+ 2*mgrs_accuracy))];
-            temp_mgrs[1] = temp_mgrs[1] - j*10;
-            temp_mgrs[2] = temp_mgrs[2] - i*10;
+            temp_mgrs = [mgrs_pos.slice(0, 5), parseInt(mgrs_pos.slice(5, 5 + mgrs_accuracy)), parseInt(mgrs_pos.slice(5 + mgrs_accuracy, 5 + 2 * mgrs_accuracy))];
+            temp_mgrs[1] = temp_mgrs[1] - j * 10;
+            temp_mgrs[2] = temp_mgrs[2] - i * 10;
             result.push(temp_mgrs.join(''));
         }
     return result
