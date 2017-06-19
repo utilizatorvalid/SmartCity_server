@@ -21,6 +21,7 @@
     "angular-openweathermap-api-factory": "^0.6.0",
     "body-parser": "^1.17.2",
     "cors": "^2.8.3",
+    "date-and-time": "^0.4.2",
     "express": "^4.15.3",
     "express-jwt": "^5.3.0",
     "mgrs": "^1.0.0",

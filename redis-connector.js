@@ -72,6 +72,7 @@ class RedisConnector {
                 obj = new User(user_id);
                 obj.toDoList = userData.toDoList;
                 obj.history = userData.history;
+                obj.ownEventsCount = userData.ownEventsCount;
             }
             return next(null, obj);
         })

@@ -10,12 +10,16 @@ class User{
     constructor(user_id){
         this.user_id = user_id;
         this.device_id = `decive|${user_id}`
+        this.ownEventsCount = 0
         this.toDoList = [];
         this.history  = [];
     }
    
-    addEvent(event, next){
+    addEvent(event, ownEvent, next){
         console.log(`add ${event._id} in ${this.toDoList}`)
+        if(ownEvent){
+            this.ownEventsCount++;
+        }
         var index = -1;
         for (var i = 0; i < this.toDoList.length; i++) {
             // console.log(`!${this.devices[i].user_id}\n${device.user_id}!=>${this.devices[i].user_id == device.user_id}`);

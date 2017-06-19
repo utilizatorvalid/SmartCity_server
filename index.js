@@ -9,7 +9,7 @@ var mgrs = require('mgrs')
 var server = http.createServer(app);
 port = process.env.PORT || 8000;
 
-
+var date = require('date-and-time');
 var auth0Settings = require('./auth0.json')
 var jwt = require('express-jwt');
 var jwtCheck = jwt({
@@ -22,8 +22,8 @@ var User = require('./user');
 var Device = require('./device');
 var RedisConnector = require('./redis-connector');
 var CrawlerManager = require('./crawler-manager');
-// var event_api_url = 'http://localhost:8080/api/events'
-var event_api_url = "http://smartcityeventapi.azurewebsites.net/api/events"
+var event_api_url = 'http://localhost:8080/api/events'
+// var event_api_url = "http://eventapi-smartcity.azurewebsites.net/api/events"
 var request = require('request')
 
 var GoogleAPI = require('./google.api')
@@ -140,21 +140,34 @@ router.route('/keys')
 
 router.route('/location/:location_id')
     .get((req, res) => {
-        redisConnector.getCoordinate(req.params.location_id, (err, coordinate) => {
-            if (err)
-                return res.status(400).json({ "status": "error while getting location" });
-            let noiseLevelMean = 0;
-            let sum = 0;
-            if (coordinate.records.length > 0) {
-                for (var i = 0; i < coordinate.records.length; i++) {
-                    let record = coordinate.records[i];
-                    sum += record.dbFrame.average
-                };
-                noiseLevelMean = sum / coordinate.records.length
-            }
-            res.status(200).json({ "noiseLevelMean": noiseLevelMean });
+        let soundZones = getZones(req.params.location_id, 3, 1);
+        // console.log(soundZones);
+        let processedZones = 0;
+        let noiseLevelMean = 0;
+        let sum = 0;
+        let count = 0;
+        soundZones.forEach((zone) => {
+            redisConnector.getCoordinate(zone, (err, coordinate) => {
+                if (err)
+                    return res.status(400).json({ "status": "error while getting location" });
 
-        })
+                if (coordinate.records.length > 0) {
+                    for (var i = 0; i < coordinate.records.length; i++) {
+                        let record = coordinate.records[i];
+                        sum += record.dbFrame.average
+                        count++;
+                    };
+                }
+                processedZones += 1;
+
+                if (processedZones == soundZones.length) {
+                    noiseLevelMean = sum / count;
+                    console.log(sum, count);
+                    res.status(200).json({ "noiseLevelMean": noiseLevelMean });
+                }
+            })
+        }, this);
+
     })
 
 router.route('/schedule')
@@ -207,7 +220,7 @@ router.route('/schedule/:event_id')
             if (err)
                 return res.status(400).json({ "status": `error while getting User${req.user.user_id}` });
 
-            user.addEvent(req.body, (err, status) => {
+            user.addEvent(req.body, false, (err, status) => {
                 if (err) {
                     return res.status(400).json("Error while adding event in toDoList")
                 }
@@ -234,6 +247,98 @@ router.route('/schedule/:event_id')
         })
     })
 
+router.route('/schedule_place')
+    .post((req, res) => {
+        console.log(req.user.user_id);
+        console.log(req.body);
+        let eventDate = new Date(req.body.goingDetails.date);
+        let sTime = date.parse(req.body.goingDetails.startTime, 'hh:mm');
+        let eTime = date.parse(req.body.goingDetails.endTime, 'hh:mm');
+        sTime = new Date(eventDate.getTime() + sTime.getTime());
+        sTime = new Date(eventDate.getTime() + eTime.getTime());
+
+        console.log('---------------------------------------', sTime.toLocaleDateString(), sTime.toLocaleTimeString());
+        console.log('---------------------------------------', sTime.toLocaleDateString(), eTime.toLocaleTimeString());
+        redisConnector.getUser(req.user.user_id, (err, user) => {
+            if (err) {
+                return res.send(400).json({ 'message': "error while retriving user from redis" });
+            }
+            console.log(user);
+            let placeDetails = req.body.placeDetails;
+            let event =
+                {
+                    "_id": `${user.user_id}_${user.ownEventsCount}`,
+                    "id": `${user.ownEventsCount}`,
+                    "name": `${placeDetails.name}`,
+                    "type": "googlePlace",
+                    "coverPicture": `${placeDetails.img}`,
+                    "description": "",
+                    "startTime": `${sTime}`,
+                    "endTime": `${eTime}`,
+                    "category": "place",
+                    "user": `${user.user_id}`,
+                    "types": `${placeDetails.types}`,
+                    "stats": {
+                        "attending": 0,
+                        "declined": 0,
+                        "maybe": 0,
+                        "noreply": 0
+                    },
+                    "venue": {
+                        "id": "ChIJEWzx0Z_8ykARAZLb9mWwBq4",
+                        "name": `${placeDetails.name}`,
+                        "about": null,
+                        "coverPicture": `${placeDetails.img}`,
+                        "profilePicture": `${placeDetails.img}`,
+                        "location": {
+                            "city": "Iasi",
+                            "country": "Romania",
+                            "latitude": `${placeDetails.geometry.location.lat}`,
+                            "longitude": `${placeDetails.geometry.location.lng}`,
+                            "street": `${placeDetails.formatted_address}`,
+                            "zip": "",
+                            "mgrs": `${placeDetails.geometry.location.mgrs}`
+                        }
+                    }
+                }
+
+            let body = {
+                event: event
+            }
+
+            console.log(body);
+            var options = {
+                method: 'POST',
+                url: `${event_api_url}/${event._id}`,
+                body: body,
+                json: true,
+                headers:
+                { 'content-type': 'application/json' }
+            }
+            request(options, (err, response, body) => {
+                if (!body)
+                    return;
+                // console.log(response);
+                // body = JSON.parse(body);
+                if (err) {
+                    return;
+                }
+
+                user.addEvent(event, true, (err, status) => {
+                    if (err) {
+                        return res.status(400).json("Error while adding event in toDoList")
+                    }
+                    redisConnector.saveObject(user.user_id, user, () => {
+                        return res.status(200).json(status);
+                    })
+
+                });
+                // return res.status(200).json({ events: eventsNearby });
+            }
+            )
+        })
+    });
+
 router.route('/events')
     .get((req, res) => {
         let params = req.query;
@@ -242,7 +347,7 @@ router.route('/events')
             params["nP"] = 3
         console.log(queryString.stringify(params));
         console.log(">>>>>>>>>>>>>>>>>", params['mgrs']);
-        let zones = getZones(params.mgrs, params.radius);
+        let zones = getZones(params.mgrs, params.radius, 10);
         console.log(zones.length, zones);
         var processedZones = 0;
         var eventsNearby = [];
@@ -384,9 +489,13 @@ router.route('/city/:mgrs_value/places')
 
 router.route('/place/:place_id')
     .get((req, res) => {
-        googleAPI.getPlaceDetais(req.params.place_id,(err, placeDetails)=>{
-            if(err)
-                return res.status(400).json({'status':'error while retriving place details'})
+        googleAPI.getPlaceDetais(req.params.place_id, (err, placeDetails) => {
+            if (err)
+                return res.status(400).json({ 'status': 'error while retriving place details' })
+            // placeDetails = JSON.parse(placeDetails);
+            console.log(placeDetails.result.geometry.location);
+            placeDetails.result.geometry.location['mgrs'] = mgrs.forward([placeDetails.result.geometry.location.lng, placeDetails.result.geometry.location.lat], 3);
+            // console.log(placeDetails, typeof(placeDetails));
             return res.status(200).json(placeDetails);
         })
     })
@@ -400,13 +509,17 @@ router.route('/place/:place_id')
 app.use('/location', jwtCheck);
 app.use('/noise', jwtCheck);
 app.use('/schedule', jwtCheck);
+app.use('/schedule_place', jwtCheck);
 app.use('/city', jwtCheck);
 app.use('/', router);
 
 
 
-getZones = (mgrs_pos, distanceFactor) => {
-    let min = -Math.trunc(distanceFactor / 2)
+/**
+ * 
+ */
+getZones = function (mgrs_pos, nearbyPlaceRadius, distaceFactor) {
+    let min = -Math.trunc(nearbyPlaceRadius / 2)
     let max = - min;
     let result = [];
     mgrs_accuracy = 3
@@ -414,8 +527,8 @@ getZones = (mgrs_pos, distanceFactor) => {
         for (var j = min; j < max - i; j++) {
 
             let temp_mgrs = [mgrs_pos.slice(0, 5), parseInt(mgrs_pos.slice(5, 5 + mgrs_accuracy)), parseInt(mgrs_pos.slice(5 + mgrs_accuracy, 5 + 2 * mgrs_accuracy))];
-            temp_mgrs[1] = temp_mgrs[1] + i * 10;
-            temp_mgrs[2] = temp_mgrs[2] + j * 10;
+            temp_mgrs[1] = temp_mgrs[1] + i * distaceFactor;
+            temp_mgrs[2] = temp_mgrs[2] + j * distaceFactor;
 
             result.push(temp_mgrs.join(''));
             if (j == -i) {
@@ -423,8 +536,8 @@ getZones = (mgrs_pos, distanceFactor) => {
             }
 
             temp_mgrs = [mgrs_pos.slice(0, 5), parseInt(mgrs_pos.slice(5, 5 + mgrs_accuracy)), parseInt(mgrs_pos.slice(5 + mgrs_accuracy, 5 + 2 * mgrs_accuracy))];
-            temp_mgrs[1] = temp_mgrs[1] - j * 10;
-            temp_mgrs[2] = temp_mgrs[2] - i * 10;
+            temp_mgrs[1] = temp_mgrs[1] - j * distaceFactor;
+            temp_mgrs[2] = temp_mgrs[2] - i * distaceFactor;
             result.push(temp_mgrs.join(''));
         }
     return result
