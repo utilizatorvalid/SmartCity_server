@@ -68,26 +68,26 @@ class GoogleAPI {
         this.GEOCODE_API_KEY = 'AIzaSyCh3JARHmzX9MdAO3-mnXN_3H2N5E0OznA'
         this.geocodeEndpoint = 'https://maps.googleapis.com/maps/api/geocode/json'
         this.placesEndpoint = 'https://maps.googleapis.com/maps/api/place/'
-        // this.placeTypes = [
-        //     'city_hall',
-        //     'church',
-        //     'university',
-        //     'library',
-        //     'book_store',
-        //     'museum',
-        //     'park',
-        //     'campground',
-        //     'cafe',
-        //     'bar',
-        //     'restaurant',
-        //     'gym',
-        //     'bowling_alley',
-        //     'night_club',
-        // ]
         this.placeTypes = [
+            'city_hall',
+            'church',
             'university',
             'library',
+            'book_store',
+            'museum',
+            'park',
+            'campground',
+            'cafe',
+            'bar',
+            'restaurant',
+            'gym',
+            'bowling_alley',
+            'night_club',
         ]
+        // this.placeTypes = [
+        //     'university',
+        //     'library',
+        // ]
     }
 
     getCityByGeocoordinate(lat, long, next) {

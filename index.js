@@ -22,8 +22,8 @@ var User = require('./user');
 var Device = require('./device');
 var RedisConnector = require('./redis-connector');
 var CrawlerManager = require('./crawler-manager');
-var event_api_url = 'http://localhost:8080/api/events'
-// var event_api_url = "http://eventapi-smartcity.azurewebsites.net/api/events"
+// var event_api_url = 'http://localhost:8080/api/events'
+var event_api_url = "http://eventapi-smartcity.azurewebsites.net/api/events"
 var request = require('request')
 
 var GoogleAPI = require('./google.api')
@@ -179,9 +179,11 @@ router.route('/schedule')
                 return res.status(400).json({ "status": `error while getting user${req.user.user_id}` });
             var fetched_events = 0;
             var user_events = [];
+            console.log(fetched_events, 'of', user.toDoList.length);
             if (user.toDoList.length == 0)
                 return res.status(200).json({ events: [] })
             user.toDoList.forEach(function (event_id) {
+                console.log(fetched_events,' ', event_id);
                 var options = {
                     method: 'GET',
                     url: `${event_api_url}/${event_id}`,
@@ -194,7 +196,7 @@ router.route('/schedule')
                         return;
                     // console.log("HERE++++++++++++++++++++++++++++++++++", body)
                     body = JSON.parse(body);
-                    // console.log(typeof(body));
+                    console.log(typeof(body), body);
                     if (err) {
                         //todo
                         return;
