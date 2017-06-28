@@ -2,7 +2,7 @@
 {
     "source":"facebook",
     "method":"GET",
-    "url":"http://fbcrawler.azurewebsites.net/events",
+    "url":"http://fb-event-crawler.azurewebsites.net/events",
     "distance":1000,
     "accessToken":"EAAZALmUcrf4oBANgk8ioM0vZB2YUYeoPjZBtIQpXBd2K07IqEVqO0L4PgND0tCgbaZBTU8ADDDhePLyf3tRugE2ylkIaCZCj0QyYzTLljfAXc8sOIN6ZCNMJyhCSbLCK3ZCMYTVSq7JFekQQhZCBBhpOEr6bQK6U9nMZD"
 
