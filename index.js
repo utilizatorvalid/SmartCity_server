@@ -274,7 +274,7 @@ router.route('/schedule_place')
                     "name": `${placeDetails.name}`,
                     "type": "googlePlace",
                     "coverPicture": `${placeDetails.img}`,
-                    "description": "",
+                    "description": `${req.body.goingDetails.description}`,
                     "startTime": `${sTime}`,
                     "endTime": `${eTime}`,
                     "category": "place",
