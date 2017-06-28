@@ -257,10 +257,10 @@ router.route('/schedule_place')
         let sTime = date.parse(req.body.goingDetails.startTime, 'hh:mm');
         let eTime = date.parse(req.body.goingDetails.endTime, 'hh:mm');
         sTime = new Date(eventDate.getTime() + sTime.getTime());
-        sTime = new Date(eventDate.getTime() + eTime.getTime());
+        eTime = new Date(eventDate.getTime() + eTime.getTime());
 
         console.log('---------------------------------------', sTime.toLocaleDateString(), sTime.toLocaleTimeString());
-        console.log('---------------------------------------', sTime.toLocaleDateString(), eTime.toLocaleTimeString());
+        console.log('---------------------------------------', eTime.toLocaleDateString(), eTime.toLocaleTimeString());
         redisConnector.getUser(req.user.user_id, (err, user) => {
             if (err) {
                 return res.send(400).json({ 'message': "error while retriving user from redis" });
